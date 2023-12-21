@@ -1,0 +1,115 @@
+---
+title: "Project 650"
+author: "Sagar Soneji fx9706"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(lubridate)
+library(ggplot2)
+library(dplyr)
+f1_project <- read.csv("/Users/sagarsoneji/Downloads/results.csv")
+head(f1_project)
+
+#convert fstest lap speed from chr to numeric
+f1_project$fastestLapSpeed <- as.numeric(f1_project$fastestLapSpeed)
+
+
+#convert fastest lap speed from char to numeric(seconds)
+con_fastestlaptime <- function(x){
+  if(length(x)> 0){
+    c_minute <- as.numeric(strsplit(x,":")[[1]][1])
+    c_sec <- as.numeric(strsplit(strsplit(x,":")[[1]][2],"\\.")[[1]][1])
+    return(c_minute*60 + c_sec)
+  }
+  else if(length(x)==0){
+    return(NA)
+  }
+}
+
+f1_project$fastestLapTimeNum <- sapply(f1_project$fastestLapTime, con_fastestlaptime)
+head(f1_project)
+
+#load the races data 
+races <- read.csv("/Users/sagarsoneji/Downloads/races.csv")
+head(races)
+
+#removing grand prix from the name 
+races$name <- gsub(" Grand Prix","",races$name)
+
+races$date <- ymd(races$date)
+
+#join by race id 
+f1_project_final <- left_join(f1_project %>% select(-time,-fastestLapTime),races %>% select(-time,-url),by = 'raceId')
+```
+
+
+
+```{r}
+#NA values 
+na_rows <- subset(f1_project_final, is.na(f1_project_final$fastestLapTimeNum))
+
+#removing NA 
+f1_project_final <- subset(f1_project_final, !is.na(f1_project_final$fastestLapTimeNum))
+
+
+head(f1_project_final)
+
+range(f1_project_final$year)
+
+f1_project_final_median <- f1_project_final %>%
+  group_by(name,year) %>% summarize(MedianFastetLapSpeed = median(fastestLapSpeed),.groups = "keep", na.rm = T)
+
+f1_project_final_median %>%
+ ggplot(aes(x = factor(year), y =MedianFastetLapSpeed, color = MedianFastetLapSpeed)) +
+  geom_point() +
+  facet_wrap(~name,ncol=9) +
+  theme(
+    axis.text.x = element_text(size=6,angle=90),
+    strip.text.x = element_text(size = 10)) +
+  labs(title='Fastest Lap per Circuit, from 2004 to 2017')+ xlab("Year")+ ylab("Median Fastest Lap Speed")+
+  guides(color = FALSE)
+
+
+```
+
+we can see that there is decrese in the speed in general as years pass by but this can be made more clear by the bellow boxplot 
+
+```{r}
+f1_project_final_median %>%
+   ggplot(aes(x=factor(year), y= MedianFastetLapSpeed, color=MedianFastetLapSpeed)) + geom_boxplot(alpha=0.5) + 
+  geom_smooth(method='loess',aes(group=1),color='red',lty=2) +
+  labs(title='Fastest Lap per Year, grouped by grand prix') + xlab("Year")+ ylab("Median Fastest Lap Speed")+
+  guides(color = FALSE)
+  
+```
+From the above plot it is evident that there has been decrease in the speed of f1 cars over time 
+
+```{r}
+f1_project_final %>%
+  group_by(name, year)%>%
+  ggplot(aes(x = fastestLapSpeed))+
+  geom_histogram(bins = 150)+facet_wrap(~name,ncol=9)+
+  labs(title = "Fastest Lap Distribution")
+```
+
+The above was for fastest lap speed , this tells us that the average speed of the cars is decreasing over time , several FIA restrictions can cause this dip in the speed 
+
+now for fastest lap time
+
+```{r}
+f1_project_final_mean_time <- f1_project_final %>%
+  group_by(name,year) %>% summarize(MeanFastetLapTime = mean(fastestLapTimeNum),.groups = "keep", na.rm = T)
+
+f1_project_final_mean_time %>%
+ ggplot(aes(x = factor(year), y =MeanFastetLapTime, color = MeanFastetLapTime)) +
+  geom_point() +
+  facet_wrap(~name,ncol=9) +
+  theme(
+    axis.text.x = element_text(size=6,angle=90),
+    strip.text.x = element_text(size = 10)) +
+  labs(title='Fastest Lap time per Circuit, from 2004 to 2017')+ xlab("Year")+ ylab("Median Fastest Lap time")+
+  guides(color = FALSE)
+```
+From the above graph we can see that the mean fastet lap time shows an general increasing trend this can further support our claim that f1 cars are getting slower over time 
